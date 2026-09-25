@@ -37,6 +37,10 @@
     async renameClient(id, name) {
       check(await sb.from(T_CLIENTES).update({ nome: name }).eq('id', id));
     },
+    // Apaga o cliente e, junto, todas as reuniões dele (on delete cascade no banco)
+    async deleteClient(id) {
+      check(await sb.from(T_CLIENTES).delete().eq('id', id));
+    },
     async createMeeting(m) {
       check(await sb.from(T_REUNIOES).insert(Object.assign({ id: m.id, cliente_id: m.clientId }, meetingPatch(m))));
     },

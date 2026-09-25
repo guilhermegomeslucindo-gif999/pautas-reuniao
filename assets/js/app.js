@@ -73,6 +73,7 @@
         <div class="head-row">
           <button class="btn btn-ghost btn-sm back" id="back" type="button">‹ Clientes</button>
           <input class="client-name" id="clientName" value="${esc(c.name)}" aria-label="Nome do cliente">
+          <button class="btn btn-danger btn-sm" id="delClient" type="button" title="Apaga o cliente e todas as reuniões dele">Excluir cliente</button>
         </div>
         <div class="meta" id="clientMeta"></div>
         <div class="tabs" role="tablist" id="tabs"></div>
@@ -83,6 +84,15 @@
     const save=async()=>{ const v=ni.value.trim(); if(!v){ ni.value=c.name; return; } if(v!==c.name){ try{ await DB.renameClient(c.id,v); c.name=v; renderSide(); }catch(e){ ni.value=c.name; showNotice('Não foi possível renomear. Tente de novo.'); } } };
     ni.addEventListener('blur',save);
     ni.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ni.blur(); } if(e.key==='Escape'){ ni.value=c.name; ni.blur(); } });
+    armButton($('#delClient'),'Confirmar: apagar cliente e reuniões',async()=>{
+      const n=clientMeetings(c.id).length;
+      try{ await DB.deleteClient(c.id); }
+      catch(e){ console.error(e); showNotice('Não foi possível excluir o cliente. Tente de novo.'); return; }
+      S.clients=S.clients.filter(x=>x.id!==c.id); S.meetings=S.meetings.filter(m=>m.clientId!==c.id);
+      S.selClient=null; S.selMeeting=null; document.body.classList.remove('has-client');
+      renderSide(); renderMain();
+      showNotice(`${c.name} foi excluído${n?` junto com ${n} ${n===1?'reunião':'reuniões'}`:''}.`);
+    });
     renderTabs(); renderSheet();
   }
   function renderMeta(){

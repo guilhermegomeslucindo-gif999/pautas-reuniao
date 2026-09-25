@@ -7,6 +7,7 @@ Responsável: Guilherme (account, Squad D).
 ## O que o sistema faz
 
 - Lista os clientes do Squad D, com busca e campo para cadastrar novos.
+- Permite renomear o cliente (clicando no nome) e excluir o cliente pelo botão **Excluir cliente**. A exclusão pede confirmação com um segundo clique e apaga também todas as reuniões daquele cliente.
 - Cada cliente tem suas reuniões separadas por data.
 - Cada reunião tem dois campos lado a lado: pautas (texto livre) e ações (lista com caixinha para marcar como feita).
 - Mostra quantas ações estão pendentes por cliente e lista as pendências de reuniões anteriores ao abrir uma reunião nova.
