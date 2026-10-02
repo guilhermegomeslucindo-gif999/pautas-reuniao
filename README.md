@@ -88,5 +88,5 @@ Por enquanto o sistema **não tem login**. Qualquer pessoa que tiver o link cons
 ## Como mexer no sistema
 
 - **Trocar nome ou função no topo da lateral:** `index.html`, bloco `class="ident"`.
-- **Mudar cores:** `assets/css/styles.css`, variáveis no início do arquivo (`--accent` é o verde).
+- **Mudar cores:** `assets/css/styles.css`, variáveis no início do arquivo (`--accent` é o laranja; a lateral usa as variáveis `--side`).
 - **Mudar o squad:** `SQUAD` em `assets/js/config.js`. O sistema só mostra clientes desse squad.
