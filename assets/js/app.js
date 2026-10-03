@@ -59,7 +59,7 @@
   $('#newClient').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); addClient(); } });
 
   /* Seleção */
-  function selectClient(cid){
+  function selectClient(cid){ cuEditing=false;
     S.selClient=cid; const ms=clientMeetings(cid); S.selMeeting=ms.length?ms[0].id:null;
     document.body.classList.toggle('has-client',!!cid); renderSide(); renderMain();
   }
@@ -76,6 +76,7 @@
           <button class="btn btn-danger btn-sm" id="delClient" type="button" title="Apaga o cliente e todas as reuniões dele">Excluir cliente</button>
         </div>
         <div class="meta" id="clientMeta"></div>
+        <div class="cubar" id="cuBar"></div>
         <div class="tabs" role="tablist" id="tabs"></div>
       </div>
       <div class="sheet" id="sheet"></div>`;
@@ -93,7 +94,50 @@
       renderSide(); renderMain();
       showNotice(`${c.name} foi excluído${n?` junto com ${n} ${n===1?'reunião':'reuniões'}`:''}.`);
     });
-    renderTabs(); renderSheet();
+    renderCuBar(); renderTabs(); renderSheet();
+  }
+  /* ClickUp: lista do cliente */
+  function parseListId(v){
+    v=String(v||'').trim();
+    const m=v.match(/\/li\/(\d+)/)||v.match(/\/l\/\d+-(\d+)-\d+/)||v.match(/^(\d+)$/);
+    return m?m[1]:null;
+  }
+  let cuEditing=false;
+  function renderCuBar(){
+    const el=$('#cuBar'); if(!el) return; const c=S.clients.find(x=>x.id===S.selClient); if(!c) return;
+    if(cuEditing){
+      el.innerHTML=`<span class="cu-tag">ClickUp</span><input class="cu-input" id="cuInput" placeholder="Cole aqui o link da lista deste cliente no ClickUp" value="${esc(c.clickupListId||'')}">
+        <button class="btn btn-primary btn-sm" id="cuSave" type="button">Salvar</button><button class="btn btn-ghost btn-sm" id="cuCancel" type="button">Cancelar</button>`;
+      const inp=$('#cuInput'); inp.focus();
+      const save=async()=>{
+        const v=inp.value.trim(); const id=v?parseListId(v):'';
+        if(id===null){ showNotice('Não reconheci esse link. Abra a lista do cliente no ClickUp e copie o endereço do navegador.'); return; }
+        try{ await DB.setClickupList(c.id,id); c.clickupListId=id; cuEditing=false; renderCuBar(); }
+        catch(e){ console.error(e); showNotice('Não foi possível salvar a lista. Tente de novo.'); }
+      };
+      $('#cuSave').addEventListener('click',save);
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter') save(); if(e.key==='Escape'){ cuEditing=false; renderCuBar(); } });
+      $('#cuCancel').addEventListener('click',()=>{ cuEditing=false; renderCuBar(); });
+      return;
+    }
+    el.innerHTML=c.clickupListId
+      ? `<span class="cu-tag">ClickUp</span><span class="cu-ok">Ações vão para a lista ${esc(c.clickupListId)}</span><button class="btn btn-ghost btn-sm" id="cuEdit" type="button">Trocar lista</button>`
+      : `<span class="cu-tag">ClickUp</span><span class="cu-none">Nenhuma lista conectada a este cliente.</span><button class="btn btn-ghost btn-sm cu-connect" id="cuEdit" type="button">Conectar lista</button>`;
+    $('#cuEdit').addEventListener('click',()=>{ cuEditing=true; renderCuBar(); });
+  }
+  async function pushAction(aid,btn){
+    const c=S.clients.find(x=>x.id===S.selClient); const mid=S.selMeeting; const m=getM(mid); if(!c||!m) return;
+    if(!c.clickupListId){ cuEditing=true; renderCuBar(); showNotice('Antes de subir, conecte a lista do ClickUp deste cliente.'); return; }
+    const a=(m.acoes||[]).find(x=>x.id===aid); if(!a||!a.text.trim()) return;
+    btn.disabled=true; btn.textContent='Enviando…';
+    try{
+      const hoje=new Date(); hoje.setHours(12,0,0,0);
+      const r=await DB.pushTask({listId:c.clickupListId,name:`${c.name} - ${a.text.trim()}`,dueDate:hoje.getTime(),
+        description:`Ação da reunião de ${fmtDate(m.date)} com ${c.name}${m.title?` (${m.title})`:''}.\nCriada pelo sistema de reuniões do Squad D.`});
+      const cur=getM(mid); const acoes=(cur.acoes||[]).map(x=>Object.assign({},x)); const t=acoes.find(x=>x.id===aid);
+      if(t){ t.clickupId=r.id; t.clickupUrl=r.url; queueSave(mid,{acoes}); }
+      if(S.selMeeting===mid) renderChecklist();
+    }catch(e){ btn.disabled=false; btn.textContent='↑ ClickUp'; showNotice(e.message); }
   }
   function renderMeta(){
     const el=$('#clientMeta'); if(!el) return;
@@ -165,6 +209,7 @@
     box.innerHTML=(m.acoes||[]).map(a=>`<div class="item${a.done?' done':''}" data-aid="${esc(a.id)}">
       <input type="checkbox" ${a.done?'checked':''} aria-label="Marcar ação como feita">
       <textarea rows="1" aria-label="Ação">${esc(a.text)}</textarea>
+      ${a.clickupUrl?`<a class="cu-link" href="${esc(a.clickupUrl)}" target="_blank" rel="noopener" title="Abrir a tarefa no ClickUp">No ClickUp ↗</a>`:`<button class="cu-btn" type="button" title="Criar esta ação como tarefa na lista do cliente no ClickUp">↑ ClickUp</button>`}
       <button class="rm" type="button" aria-label="Remover ação" title="Remover">×</button></div>`).join('')+
       `<div class="new-item"><span aria-hidden="true">+</span><input id="newAction" placeholder="Adicionar ação" aria-label="Adicionar ação"></div>`;
     box.querySelectorAll('textarea').forEach(autosize);
@@ -188,6 +233,8 @@
       a.done=e.target.checked; queueSave(m.id,{acoes}); }
   });
   document.addEventListener('click',e=>{
+    const cb=e.target.closest&&e.target.closest('#checklist .cu-btn');
+    if(cb){ pushAction(cb.closest('.item').dataset.aid,cb); return; }
     const rm=e.target.closest&&e.target.closest('#checklist .rm'); if(!rm) return;
     const aid=rm.closest('.item').dataset.aid; const acoes=curAcoes(); const i=acoes.findIndex(x=>x.id===aid); if(i<0) return;
     acoes.splice(i,1); setAcoes(acoes); renderChecklist(acoes[i-1]?.id||acoes[i]?.id,true);
@@ -224,6 +271,7 @@
     renderSide();
     const n=$('#clientName'); const c=S.clients.find(x=>x.id===S.selClient);
     if(n&&c&&document.activeElement!==n) n.value=c.name;
+    if(c&&!cuEditing) renderCuBar();
   }
   function onMeetings(list){
     S.meetings=list;
