@@ -27,11 +27,13 @@ reunioes-squad-d/
 │       ├── db.js               Leitura e gravação no banco
 │       └── app.js              Telas e comportamento do sistema
 ├── api/
-│   └── clickup-task.js         Função da Vercel que cria tarefas no ClickUp
+│   ├── clickup-task.js         Função da Vercel que cria tarefas no ClickUp
+│   └── clickup-list.js         Função da Vercel que confere o link da lista
 ├── supabase/
 │   ├── migrations/
 │   │   ├── 001_criar_tabelas.sql   Cria as tabelas e as regras de acesso
-│   │   └── 002_clickup_lista_por_cliente.sql   Coluna da lista do ClickUp
+│   │   ├── 002_clickup_lista_por_cliente.sql   Coluna da lista do ClickUp
+│   │   └── 003_clickup_nome_da_lista.sql       Nome da lista do ClickUp
 │   └── seed.sql                Cadastra os 17 clientes iniciais
 ├── vercel.json                 Configuração da Vercel
 ├── .gitignore
@@ -51,7 +53,7 @@ O banco já está criado e configurado no projeto Supabase `gxywpcnafudktgmygxbz
 
 Excluir um cliente no banco apaga as reuniões dele junto. As tabelas têm o prefixo `squad_` para não misturar com as outras tabelas que já existem nesse projeto.
 
-Para recriar tudo num projeto novo: abra o **SQL Editor** do Supabase, rode os arquivos de `supabase/migrations/` em ordem (001, 002) e depois `supabase/seed.sql`. Em seguida troque o endereço e a chave em `assets/js/config.js` (ficam em Project Settings > API Keys; use a chave **publishable**, nunca a secret).
+Para recriar tudo num projeto novo: abra o **SQL Editor** do Supabase, rode os arquivos de `supabase/migrations/` em ordem (001, 002, 003) e depois `supabase/seed.sql`. Em seguida troque o endereço e a chave em `assets/js/config.js` (ficam em Project Settings > API Keys; use a chave **publishable**, nunca a secret).
 
 ## Como subir no GitHub
 
@@ -114,6 +116,9 @@ A chave fica só na Vercel. Ela não aparece no código da página nem no GitHub
 
 1. No ClickUp, abra a lista de tarefas do cliente (por exemplo, a lista da Trevo) e copie o endereço da barra do navegador.
 2. No sistema, abra o cliente, clique em **Conectar lista** (abaixo do nome), cole o link e clique em **Salvar**.
+3. O sistema confere o link com o ClickUp e mostra o nome da lista conectada. Qualquer formato de link da lista funciona (inclusive os que terminam em algo como `8cqbp4k-52237`).
+
+Este passo só funciona depois que a chave estiver configurada na Vercel (passos 1 e 2 acima).
 
 Se você tentar subir uma ação de um cliente sem lista conectada, o sistema abre esse campo automaticamente. Para mudar depois, use **Trocar lista**.
 

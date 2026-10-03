@@ -6,7 +6,7 @@
   const T_CLIENTES = 'squad_clientes';
   const T_REUNIOES = 'squad_reunioes';
 
-  const toClient = r => ({ id: r.id, name: r.nome, order: r.ordem, squad: r.squad, clickupListId: r.clickup_list_id || '' });
+  const toClient = r => ({ id: r.id, name: r.nome, order: r.ordem, squad: r.squad, clickupListId: r.clickup_list_id || '', clickupListName: r.clickup_list_name || '' });
   const toMeeting = r => ({
     id: r.id, clientId: r.cliente_id, date: r.data || '', title: r.assunto || '',
     pautas: r.pautas || '', acoes: Array.isArray(r.acoes) ? r.acoes : [],
@@ -21,6 +21,16 @@
     return o;
   };
   const check = ({ data, error }) => { if (error) throw error; return data; };
+  async function callApi(path, body, fallback) {
+    let r;
+    try {
+      r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    if (r.ok) return j;
+    if (j.error) throw new Error(j.error);
+    throw new Error(r.status === 404 ? 'A integração com o ClickUp só funciona no endereço publicado na Vercel.' : fallback);
+  }
 
   window.DB = {
     async listClients() {
@@ -38,19 +48,17 @@
       check(await sb.from(T_CLIENTES).update({ nome: name }).eq('id', id));
     },
     // Guarda qual lista do ClickUp recebe as tarefas deste cliente
-    async setClickupList(id, listId) {
-      check(await sb.from(T_CLIENTES).update({ clickup_list_id: listId || null }).eq('id', id));
+    async setClickupList(id, listId, listName) {
+      check(await sb.from(T_CLIENTES).update({ clickup_list_id: listId || null, clickup_list_name: listName || null }).eq('id', id));
+    },
+    // Pergunta ao ClickUp (pela função da Vercel) qual lista está por trás do link colado
+    async resolveList(link) {
+      return callApi('/api/clickup-list', { link }, 'Não foi possível conferir a lista no ClickUp.');
     },
     // Cria uma tarefa no ClickUp pela função da Vercel (api/clickup-task.js),
     // que guarda a chave do ClickUp em segredo
     async pushTask(body) {
-      let r;
-      try {
-        r = await fetch('/api/clickup-task', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      } catch (e) { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
-      let j = {}; try { j = await r.json(); } catch (e) {}
-      if (!r.ok) throw new Error(j.error || (r.status === 404 ? 'A integração com o ClickUp só funciona no endereço publicado na Vercel.' : 'Não foi possível criar a tarefa no ClickUp.'));
-      return j;
+      return callApi('/api/clickup-task', body, 'Não foi possível criar a tarefa no ClickUp.');
     },
     // Apaga o cliente e, junto, todas as reuniões dele (on delete cascade no banco)
     async deleteClient(id) {

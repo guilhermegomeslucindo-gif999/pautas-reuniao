@@ -97,23 +97,20 @@
     renderCuBar(); renderTabs(); renderSheet();
   }
   /* ClickUp: lista do cliente */
-  function parseListId(v){
-    v=String(v||'').trim();
-    const m=v.match(/\/li\/(\d+)/)||v.match(/\/l\/\d+-(\d+)-\d+/)||v.match(/^(\d+)$/);
-    return m?m[1]:null;
-  }
   let cuEditing=false;
   function renderCuBar(){
     const el=$('#cuBar'); if(!el) return; const c=S.clients.find(x=>x.id===S.selClient); if(!c) return;
     if(cuEditing){
-      el.innerHTML=`<span class="cu-tag">ClickUp</span><input class="cu-input" id="cuInput" placeholder="Cole aqui o link da lista deste cliente no ClickUp" value="${esc(c.clickupListId||'')}">
+      el.innerHTML=`<span class="cu-tag">ClickUp</span><input class="cu-input" id="cuInput" placeholder="Cole aqui o link da lista deste cliente no ClickUp" value="">
         <button class="btn btn-primary btn-sm" id="cuSave" type="button">Salvar</button><button class="btn btn-ghost btn-sm" id="cuCancel" type="button">Cancelar</button>`;
       const inp=$('#cuInput'); inp.focus();
       const save=async()=>{
-        const v=inp.value.trim(); const id=v?parseListId(v):'';
-        if(id===null){ showNotice('Não reconheci esse link. Abra a lista do cliente no ClickUp e copie o endereço do navegador.'); return; }
-        try{ await DB.setClickupList(c.id,id); c.clickupListId=id; cuEditing=false; renderCuBar(); }
-        catch(e){ console.error(e); showNotice('Não foi possível salvar a lista. Tente de novo.'); }
+        const v=inp.value.trim(); const btn=$('#cuSave');
+        try{
+          let id='', name='';
+          if(v){ btn.disabled=true; btn.textContent='Conferindo…'; const r=await DB.resolveList(v); id=r.listId; name=r.listName; }
+          await DB.setClickupList(c.id,id,name); c.clickupListId=id; c.clickupListName=name; cuEditing=false; renderCuBar();
+        }catch(e){ console.error(e); btn.disabled=false; btn.textContent='Salvar'; showNotice(e.message||'Não foi possível salvar a lista. Tente de novo.'); }
       };
       $('#cuSave').addEventListener('click',save);
       inp.addEventListener('keydown',e=>{ if(e.key==='Enter') save(); if(e.key==='Escape'){ cuEditing=false; renderCuBar(); } });
@@ -121,7 +118,7 @@
       return;
     }
     el.innerHTML=c.clickupListId
-      ? `<span class="cu-tag">ClickUp</span><span class="cu-ok">Ações vão para a lista ${esc(c.clickupListId)}</span><button class="btn btn-ghost btn-sm" id="cuEdit" type="button">Trocar lista</button>`
+      ? `<span class="cu-tag">ClickUp</span><span class="cu-ok">Ações vão para a lista <b>${esc(c.clickupListName||c.clickupListId)}</b></span><button class="btn btn-ghost btn-sm" id="cuEdit" type="button">Trocar lista</button>`
       : `<span class="cu-tag">ClickUp</span><span class="cu-none">Nenhuma lista conectada a este cliente.</span><button class="btn btn-ghost btn-sm cu-connect" id="cuEdit" type="button">Conectar lista</button>`;
     $('#cuEdit').addEventListener('click',()=>{ cuEditing=true; renderCuBar(); });
   }
