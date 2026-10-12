@@ -156,3 +156,18 @@ button{cursor:pointer}
 .cu-btn:disabled{opacity:.6;cursor:wait}
 .cu-link{flex-shrink:0;margin-top:2px;font-size:12.5px;font-weight:600;color:var(--accent-text);text-decoration:none;white-space:nowrap}
 .cu-link:hover{text-decoration:underline}
+
+/* Seletor Reuniões / Lembretes */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0 14px 12px;padding:4px;border-radius:10px;background:var(--side-field);border:1px solid var(--side-line)}
+.mode{border:0;border-radius:7px;padding:7px 8px;background:transparent;color:var(--side-muted);font-weight:600;font-size:14px}
+.mode:hover{color:var(--side-ink)}
+.mode[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+
+/* Lembretes */
+.eyebrow{font-size:13px;font-weight:700;color:var(--accent-text);margin-bottom:2px}
+.rem-count{color:var(--accent-text)}
+.rem-card{max-width:900px}
+.rem-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rem-tools{display:flex;align-items:center;gap:8px}
+.rem-list{min-height:0;padding-bottom:14px}
+.rem-hidden{margin:6px 8px 0;font-size:13px;color:var(--muted)}

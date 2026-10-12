@@ -1,6 +1,8 @@
 // Interface do sistema de reuniões do Squad D
 (function(){
-  const S={clients:[],meetings:[],selClient:null,selMeeting:null,search:'',loaded:{c:false,m:false}};
+  const S={clients:[],meetings:[],selClient:null,selMeeting:null,search:'',loaded:{c:false,m:false},mode:'reunioes',hideDone:false};
+  try{ if(localStorage.getItem('sqd.mode')==='lembretes') S.mode='lembretes'; S.hideDone=localStorage.getItem('sqd.hideDone')==='1'; }catch(e){}
+  const remWork={},remPending={},remInflight={},remTimers={};
   const work={},pending={},inflight={},timers={},creating={};
   const $=(s,el=document)=>el.querySelector(s);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -68,7 +70,10 @@
   /* Principal */
   function renderMain(){
     const main=$('#main'); const c=S.clients.find(x=>x.id===S.selClient);
-    if(!c){ main.innerHTML=`<div class="empty"><h2>Escolha um cliente</h2>Selecione um cliente na lista para abrir as reuniões, anotar as pautas e as ações de cada encontro.</div>`; return; }
+    if(!c){ main.innerHTML=S.mode==='lembretes'
+      ? `<div class="empty"><h2>Escolha um cliente</h2>Selecione um cliente na lista para anotar lembretes e pontos para fazer.</div>`
+      : `<div class="empty"><h2>Escolha um cliente</h2>Selecione um cliente na lista para abrir as reuniões, anotar as pautas e as ações de cada encontro.</div>`; return; }
+    if(S.mode==='lembretes'){ renderReminders(c); return; }
     main.innerHTML=`<div class="head">
         <div class="head-row">
           <button class="btn btn-ghost btn-sm back" id="back" type="button">‹ Clientes</button>
@@ -80,12 +85,16 @@
         <div class="tabs" role="tablist" id="tabs"></div>
       </div>
       <div class="sheet" id="sheet"></div>`;
+    bindClientHead(c);
+    renderCuBar(); renderTabs(); renderSheet();
+  }
+  function bindClientHead(c){
     $('#back').addEventListener('click',()=>{ S.selClient=null; document.body.classList.remove('has-client'); renderSide(); renderMain(); });
     const ni=$('#clientName');
     const save=async()=>{ const v=ni.value.trim(); if(!v){ ni.value=c.name; return; } if(v!==c.name){ try{ await DB.renameClient(c.id,v); c.name=v; renderSide(); }catch(e){ ni.value=c.name; showNotice('Não foi possível renomear. Tente de novo.'); } } };
     ni.addEventListener('blur',save);
     ni.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ni.blur(); } if(e.key==='Escape'){ ni.value=c.name; ni.blur(); } });
-    armButton($('#delClient'),'Confirmar: apagar cliente e reuniões',async()=>{
+    armButton($('#delClient'),'Confirmar: apagar cliente e tudo dele',async()=>{
       const n=clientMeetings(c.id).length;
       try{ await DB.deleteClient(c.id); }
       catch(e){ console.error(e); showNotice('Não foi possível excluir o cliente. Tente de novo.'); return; }
@@ -94,8 +103,110 @@
       renderSide(); renderMain();
       showNotice(`${c.name} foi excluído${n?` junto com ${n} ${n===1?'reunião':'reuniões'}`:''}.`);
     });
-    renderCuBar(); renderTabs(); renderSheet();
   }
+
+  /* ---------- Lembretes (por cliente; não contam nas ações nem vão pro ClickUp) ---------- */
+  const getRem=cid=>remWork[cid]||((S.clients.find(x=>x.id===cid)||{}).lembretes||[]);
+  function renderReminders(c){
+    const main=$('#main');
+    main.innerHTML=`<div class="head">
+        <div class="eyebrow">Lembretes</div>
+        <div class="head-row">
+          <button class="btn btn-ghost btn-sm back" id="back" type="button">‹ Clientes</button>
+          <input class="client-name" id="clientName" value="${esc(c.name)}" aria-label="Nome do cliente">
+          <button class="btn btn-danger btn-sm" id="delClient" type="button" title="Apaga o cliente, as reuniões e os lembretes dele">Excluir cliente</button>
+        </div>
+        <div class="meta" id="remMeta"></div>
+      </div>
+      <div class="sheet">
+        <section class="card rem-card">
+          <div class="card-h rem-h">
+            <div><h2>Lembretes e pontos para fazer</h2><p>Enter cria a próxima linha. Marque quando estiver feito.</p></div>
+            <div class="rem-tools"><span class="status" id="remStatus" aria-live="polite"></span>
+              <button class="btn btn-ghost btn-sm" id="hideDone" type="button" aria-pressed="${S.hideDone}">${S.hideDone?'Mostrar concluídos':'Ocultar concluídos'}</button></div>
+          </div>
+          <div class="checklist rem-list" id="remList"></div>
+        </section>
+      </div>`;
+    bindClientHead(c);
+    $('#hideDone').addEventListener('click',()=>{ S.hideDone=!S.hideDone; try{ localStorage.setItem('sqd.hideDone',S.hideDone?'1':'0'); }catch(e){} renderReminders(c); });
+    renderRemList();
+  }
+  function renderRemMeta(){
+    const el=$('#remMeta'); if(!el) return; const l=getRem(S.selClient).filter(x=>(x.text||'').trim());
+    const p=l.filter(x=>!x.done).length, d=l.length-p;
+    el.innerHTML=`<b class="rem-count">${p}</b> ${p===1?'pendente':'pendentes'}, ${d} ${d===1?'concluído':'concluídos'}`;
+  }
+  function renderRemList(focusId,caretEnd){
+    const box=$('#remList'); if(!box) return;
+    const list=getRem(S.selClient);
+    const shown=list.filter(r=>!(S.hideDone&&r.done));
+    const hidden=list.length-shown.length;
+    box.innerHTML=shown.map(r=>`<div class="item${r.done?' done':''}" data-rid="${esc(r.id)}">
+      <input type="checkbox" ${r.done?'checked':''} aria-label="Marcar lembrete como feito">
+      <textarea rows="1" aria-label="Lembrete">${esc(r.text)}</textarea>
+      <button class="rm" type="button" aria-label="Remover lembrete" title="Remover">×</button></div>`).join('')+
+      `<div class="new-item"><span aria-hidden="true">+</span><input id="newRem" placeholder="Adicionar anotação" aria-label="Adicionar anotação"></div>`+
+      (hidden?`<p class="rem-hidden">${hidden} ${hidden===1?'concluído oculto':'concluídos ocultos'}</p>`:'');
+    box.querySelectorAll('textarea').forEach(autosize);
+    if(focusId){ const t=box.querySelector(`[data-rid="${focusId}"] textarea`); if(t){ t.focus(); const p=caretEnd?t.value.length:0; t.setSelectionRange(p,p); } }
+    renderRemMeta();
+  }
+  const curRem=()=>getRem(S.selClient).map(r=>Object.assign({},r));
+  function setRem(list){
+    const cid=S.selClient; remWork[cid]=list; remPending[cid]=true;
+    const st=$('#remStatus'); if(st) st.textContent='Salvando…';
+    clearTimeout(remTimers[cid]); remTimers[cid]=setTimeout(()=>flushRem(cid),700);
+    renderRemMeta();
+  }
+  async function flushRem(cid,retried){
+    if(remInflight[cid]){ clearTimeout(remTimers[cid]); remTimers[cid]=setTimeout(()=>flushRem(cid),300); return; }
+    if(!remPending[cid]) return;
+    remPending[cid]=false; remInflight[cid]=true; const list=remWork[cid];
+    try{
+      await DB.setReminders(cid,list);
+      const c=S.clients.find(x=>x.id===cid); if(c) c.lembretes=list;
+      if(!remPending[cid]){ delete remWork[cid]; const st=$('#remStatus'); if(st&&S.selClient===cid) st.textContent='Salvo'; }
+    }catch(e){
+      console.error(e); remPending[cid]=true; remInflight[cid]=false;
+      if(!retried){ setTimeout(()=>flushRem(cid,true),800); return; }
+      const st=$('#remStatus'); if(st) st.textContent='Não salvou. Tente de novo.';
+    }finally{ remInflight[cid]=false; }
+  }
+  window.addEventListener('beforeunload',()=>Object.keys(remPending).forEach(cid=>{ if(remPending[cid]) flushRem(cid); }));
+  document.addEventListener('input',e=>{
+    const it=e.target.closest&&e.target.closest('#remList .item'); if(!it||e.target.tagName!=='TEXTAREA') return;
+    autosize(e.target); const l=curRem(); const r=l.find(x=>x.id===it.dataset.rid); if(!r) return; r.text=e.target.value; setRem(l);
+  });
+  document.addEventListener('change',e=>{
+    const it=e.target.closest&&e.target.closest('#remList .item'); if(!it||e.target.type!=='checkbox') return;
+    const l=curRem(); const r=l.find(x=>x.id===it.dataset.rid); if(!r) return;
+    r.done=e.target.checked; setRem(l);
+    if(S.hideDone&&r.done) renderRemList(); else it.classList.toggle('done',r.done);
+  });
+  document.addEventListener('click',e=>{
+    const rm=e.target.closest&&e.target.closest('#remList .rm'); if(!rm) return;
+    const id=rm.closest('.item').dataset.rid; const l=curRem(); const i=l.findIndex(x=>x.id===id); if(i<0) return;
+    l.splice(i,1); setRem(l); renderRemList(l[i-1]?.id||l[i]?.id,true);
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.target.id==='newRem'&&e.key==='Enter'){ e.preventDefault(); const v=e.target.value.trim(); if(!v) return;
+      const l=curRem(); l.push({id:uid(),text:v,done:false,createdAt:Date.now()}); setRem(l); renderRemList(); $('#newRem').focus(); return; }
+    const it=e.target.closest&&e.target.closest('#remList .item'); if(!it||e.target.tagName!=='TEXTAREA') return;
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); const l=curRem(); const i=l.findIndex(x=>x.id===it.dataset.rid);
+      const n={id:uid(),text:'',done:false,createdAt:Date.now()}; l.splice(i+1,0,n); setRem(l); renderRemList(n.id); }
+    else if(e.key==='Backspace'&&e.target.value===''){ e.preventDefault(); const l=curRem(); const i=l.findIndex(x=>x.id===it.dataset.rid); if(i<0) return;
+      l.splice(i,1); setRem(l); if(l[i-1]) renderRemList(l[i-1].id,true); else { renderRemList(); $('#newRem').focus(); } }
+  });
+
+  /* ---------- Troca entre Reuniões e Lembretes ---------- */
+  function setMode(m){
+    if(m===S.mode) return; S.mode=m; try{ localStorage.setItem('sqd.mode',m); }catch(e){}
+    document.querySelectorAll('.mode').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.mode===m)));
+    cuEditing=false; renderMain();
+  }
+  document.querySelectorAll('.mode').forEach(b=>{ b.setAttribute('aria-selected',String(b.dataset.mode===S.mode)); b.addEventListener('click',()=>setMode(b.dataset.mode)); });
+
   /* ClickUp: lista do cliente */
   let cuEditing=false;
   function renderCuBar(){
@@ -268,13 +379,16 @@
     renderSide();
     const n=$('#clientName'); const c=S.clients.find(x=>x.id===S.selClient);
     if(n&&c&&document.activeElement!==n) n.value=c.name;
-    if(c&&!cuEditing) renderCuBar();
+    if(c&&S.mode==='lembretes'){
+      const box=$('#remList'); const editing=box&&box.contains(document.activeElement);
+      if(!editing&&!remPending[c.id]&&!remInflight[c.id]) renderRemList(); else renderRemMeta();
+    } else if(c&&!cuEditing) renderCuBar();
   }
   function onMeetings(list){
     S.meetings=list;
     Object.keys(work).forEach(id=>{ if(!S.meetings.find(m=>m.id===id)&&(pending[id]||inflight[id]||work[id].createdAt>Date.now()-10000)) S.meetings.push(work[id]); });
     Object.keys(work).forEach(id=>{ if(!pending[id]&&!inflight[id]&&list.find(m=>m.id===id)) delete work[id]; });
-    S.loaded.m=true; renderSide(); if(!S.selClient) return;
+    S.loaded.m=true; renderSide(); if(!S.selClient||S.mode==='lembretes') return;
     if(S.selMeeting&&!S.meetings.find(m=>m.id===S.selMeeting)){ const ms=clientMeetings(S.selClient); S.selMeeting=ms.length?ms[0].id:null; renderTabs(); renderSheet(); return; }
     renderTabs();
     const sheet=$('#sheet'); const editing=sheet&&sheet.contains(document.activeElement);

@@ -6,7 +6,7 @@
   const T_CLIENTES = 'squad_clientes';
   const T_REUNIOES = 'squad_reunioes';
 
-  const toClient = r => ({ id: r.id, name: r.nome, order: r.ordem, squad: r.squad, clickupListId: r.clickup_list_id || '', clickupListName: r.clickup_list_name || '' });
+  const toClient = r => ({ id: r.id, name: r.nome, order: r.ordem, squad: r.squad, clickupListId: r.clickup_list_id || '', clickupListName: r.clickup_list_name || '', lembretes: Array.isArray(r.lembretes) ? r.lembretes : [] });
   const toMeeting = r => ({
     id: r.id, clientId: r.cliente_id, date: r.data || '', title: r.assunto || '',
     pautas: r.pautas || '', acoes: Array.isArray(r.acoes) ? r.acoes : [],
@@ -59,6 +59,10 @@
     // que guarda a chave do ClickUp em segredo
     async pushTask(body) {
       return callApi('/api/clickup-task', body, 'Não foi possível criar a tarefa no ClickUp.');
+    },
+    // Salva a lista de lembretes do cliente (não entra na contagem de ações nem vai pro ClickUp)
+    async setReminders(id, lembretes) {
+      check(await sb.from(T_CLIENTES).update({ lembretes }).eq('id', id));
     },
     // Apaga o cliente e, junto, todas as reuniões dele (on delete cascade no banco)
     async deleteClient(id) {
