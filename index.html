@@ -1,37 +1,371 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Reuniões do Squad D</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗂️</text></svg>">
+<title>Squad D · Painel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23ff7a2f'/%3E%3Ctext x='16' y='21.5' font-family='Arial' font-weight='700' font-size='15' text-anchor='middle' fill='%231a0d04'%3ED%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sidebar com marca + seletor de modo (Reuniões / Lembretes) + clientes; área principal troca conforme o modo */
+:root{
+  --bg:#121110; --side:#0b0a09; --panel:#1a1918; --field:#1f1d1b; --line:#2a2725;
+  --fg:#f4f1ee; --muted:#8f8983; --accent:#ff7a2f; --accent-ink:#1a0d04; --accent-soft:#3a2214; --danger:#ff6b5a;
+  --font:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-columns:300px minmax(0,1fr);height:100%}
+
+/* Sidebar */
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.brand{display:flex;align-items:center;gap:12px;padding:20px 16px 14px}
+.avatar{width:44px;height:44px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
+.brand h1{margin:0;font-size:19px;font-weight:700;display:flex;align-items:center;gap:8px}
+.brand h1::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+
+.switch{margin:0 16px 14px;display:grid;grid-template-columns:1fr 1fr;background:var(--field);border:1px solid var(--line);border-radius:12px;padding:4px;position:relative}
+.switch button{position:relative;z-index:1;border:0;background:none;padding:9px 8px;border-radius:9px;font-weight:600;color:var(--muted);font-size:14.5px;display:flex;align-items:center;justify-content:center;gap:7px}
+.switch button[aria-selected="true"]{color:var(--accent-ink)}
+.switch .pill{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:var(--accent);border-radius:9px;transition:transform .22s ease}
+.switch[data-mode="lembretes"] .pill{transform:translateX(100%)}
+.switch svg{width:15px;height:15px}
+
+.search{margin:0 16px;padding:11px 14px;background:var(--field);border:1px solid var(--line);border-radius:10px;width:calc(100% - 32px)}
+.search::placeholder,.add-row input::placeholder{color:var(--muted)}
+.count{padding:16px 18px 6px;color:var(--muted);font-size:12.5px}
+.clients{list-style:none;margin:0;padding:0 10px 10px;overflow-y:auto;flex:1;min-height:0}
+.clients button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;border-radius:9px;padding:11px 10px;font-size:15px}
+.clients button:hover{background:var(--field)}
+.clients button[aria-current="true"]{background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+.clients .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{flex:none;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.empty-search{color:var(--muted);padding:10px;font-size:14px}
+.add-box{border-top:1px solid var(--line);padding:12px 16px 16px}
+.add-box label{display:block;color:var(--muted);font-size:12.5px;margin-bottom:8px}
+.add-row{display:flex;gap:8px}
+.add-row input{flex:1;min-width:0;padding:11px 12px;background:var(--field);border:1px solid var(--line);border-radius:10px}
+.btn-primary{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:0 16px;font-weight:700}
+.backup{display:flex;gap:8px;padding:0 16px 16px}
+.backup button{flex:1;background:none;border:1px solid var(--line);border-radius:10px;padding:8px;color:var(--muted);font-size:13px}
+.backup button:hover{color:var(--fg);border-color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:#121110;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;z-index:10}
+
+/* Main */
+.main{overflow-y:auto;min-height:0;padding-block:24px 40px;padding-inline:clamp(16px,3vw,40px)}
+.preview{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;color:var(--accent);border:1px solid var(--accent-soft);background:#1d140e;border-radius:999px;padding:5px 12px;margin-bottom:14px}
+.mode-tag{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:2px}
+.head{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.title{flex:1;min-width:220px;font-size:clamp(26px,3vw,36px);font-weight:700;background:transparent;border:1px solid transparent;border-radius:10px;padding:4px 12px;margin-left:-12px}
+.title:hover{border-color:var(--line)}
+.title:focus{border-color:var(--accent);outline:none;background:var(--field)}
+.btn-ghost-danger{background:none;border:1px solid var(--line);border-radius:10px;color:var(--danger);padding:10px 16px;font-weight:500}
+.btn-ghost-danger:hover{border-color:var(--danger)}
+.confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.confirm .yes{background:var(--danger);color:#1a0705;border:0;border-radius:10px;padding:10px 14px;font-weight:700}
+.confirm .no{background:none;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.sub{color:var(--muted);margin:6px 0 20px;font-size:14.5px}
+.sub b{color:var(--accent);font-weight:600}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;min-width:0;display:flex;flex-direction:column}
+.card-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:18px 22px 14px;border-bottom:1px solid var(--line)}
+.card-head h2{margin:0;font-size:18px;font-weight:700}
+.card-head p{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--field);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
+.chip:hover{color:var(--fg)}
+.chip[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+
+.items{list-style:none;margin:0;padding:6px 0}
+.item{display:flex;align-items:flex-start;gap:12px;padding:3px 22px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item input[type=checkbox]{appearance:none;flex:none;width:20px;height:20px;margin-top:9px;border:1.5px solid var(--muted);border-radius:5px;background:transparent;display:grid;place-items:center;cursor:pointer}
+.item input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+.item input[type=checkbox]:checked::after{content:"";width:5px;height:10px;border:solid var(--accent-ink);border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+.item textarea{flex:1;min-width:0;resize:none;background:transparent;border:0;padding:8px 0;line-height:1.5;font-size:15.5px;overflow:hidden;outline:none}
+.item.done textarea{color:var(--muted);text-decoration:line-through}
+.item .del{flex:none;background:none;border:0;color:var(--muted);opacity:0;padding:8px 4px;font-size:18px;line-height:1}
+.item:hover .del,.item:focus-within .del{opacity:1}
+.item .del:hover{color:var(--danger)}
+.add-line{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;padding:12px 22px 16px;color:var(--muted);text-align:left}
+.add-line span{color:var(--accent);font-size:20px;width:20px;text-align:center}
+.add-line:hover{color:var(--fg)}
+
+/* Reuniões */
+.mtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.mtab{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 16px;color:var(--muted);font-weight:500;display:flex;align-items:center;gap:8px}
+.mtab[aria-selected="true"]{background:var(--fg);color:#121110;border-color:var(--fg);font-weight:600}
+.mtab .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.mtab-new{background:none;border:1px dashed var(--accent);color:var(--accent);font-weight:600}
+.mbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.mbar input{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+.mbar .mt{flex:1;min-width:200px}
+.status{color:var(--muted);font-size:13px}
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px}
+.pautas{width:100%;min-height:420px;flex:1;resize:vertical;border:0;outline:none;background:transparent;padding:12px 22px 18px;line-height:30px;font-size:15.5px;
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 29px,var(--line) 29px,var(--line) 30px);background-attachment:local;background-position:0 12px}
+.mfoot{display:flex;justify-content:flex-end;margin-top:20px}
+.nothing{padding:60px 16px;color:var(--muted);text-align:center}
+.nothing .btn-primary{margin-top:14px;padding:11px 18px}
+
+.fade{animation:fade .2s ease}
+@keyframes fade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (max-width:960px){.cols{grid-template-columns:1fr}.pautas{min-height:260px}}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:auto;min-height:100%}
+  .side{border-right:0;border-bottom:1px solid var(--line)}
+  .clients{max-height:34vh}
+  .main{overflow:visible}
+  .item{padding:3px 14px}.card-head,.add-line{padding-inline:14px}.pautas{padding-inline:14px}
+  .item .del{opacity:1}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
 </head>
 <body>
 <div class="app">
-  <aside class="side" aria-label="Clientes">
-    <div class="ident"><span class="avatar" aria-hidden="true">G</span><div><b>Squad D</b><span>Guilherme, account</span></div></div>
-    <div class="search-wrap"><input class="search" id="search" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente"></div>
-    <div id="sideNotice"></div>
-    <div class="list-label" id="listLabel">Clientes</div>
-    <ul class="client-list" id="clientList"><li class="muted">Carregando clientes…</li></ul>
-    <div class="add-client">
-      <label for="newClient">Cadastrar cliente</label>
+  <aside class="side">
+    <div class="brand">
+      <div class="avatar">G</div>
+      <div><h1>Squad D</h1><p>Guilherme, account</p></div>
+    </div>
+    <div class="switch" id="switch" data-mode="reunioes" role="tablist" aria-label="Modo do painel">
+      <span class="pill" aria-hidden="true"></span>
+      <button role="tab" data-mode="reunioes" aria-selected="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Reuniões</button>
+      <button role="tab" data-mode="lembretes" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></svg>Lembretes</button>
+    </div>
+    <input id="search" class="search" type="search" placeholder="Buscar cliente" autocomplete="off">
+    <div class="count" id="count"></div>
+    <ul class="clients" id="clients"></ul>
+    <form class="add-box" id="addForm">
+      <label for="newName">Cadastrar cliente</label>
       <div class="add-row">
-        <input id="newClient" placeholder="Nome da marmoraria" autocomplete="off">
-        <button class="btn btn-primary" id="addClientBtn" type="button">Adicionar</button>
+        <input id="newName" placeholder="Nome da marmoraria" autocomplete="off">
+        <button class="btn-primary" type="submit">Adicionar</button>
       </div>
+    </form>
+    <div class="backup">
+      <button type="button" id="exportBtn">Exportar backup</button>
+      <button type="button" id="importBtn">Importar backup</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
     </div>
   </aside>
   <main class="main" id="main"></main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
-<script src="assets/js/config.js"></script>
-<script src="assets/js/db.js"></script>
-<script src="assets/js/app.js"></script>
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const uid = () => Math.random().toString(36).slice(2,10);
+  const esc = s => String(s??"").replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+  const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+  const fmtDate = d => { try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"}).replace(/\./g,""); }catch(e){ return d; } };
+  const blank = () => ({id:uid(),text:"",done:false});
+
+  const NAMES = ["Marmoraria Teixeira Stones","Marmoraria Ambiente Padrão","Marmoraria Trevo","Prolar","Marmoraria Eimagran","Marmoraria GVI","Marmoraria Nacional","Marmoraria Real","Occhio Blu","Marmoraria Santa Felicidade","Ricardo Estuqui","Marmoraria Bella Mármores","Marmoraria BR","Marmoraria Orus Concept","Nobile Marmo","Marmoraria Jundiaí","Marmoraria 4d","Marmoraria Wilson Mármores","Marmoraria Tempo Novo"];
+  const KEY = "squadd-painel-v1";
+  function seed(){
+    const list = NAMES.map((name,i)=>({id:"c"+(i+1),name,lembretes:[blank()],meetings:[]}));
+    list[3].meetings.push({id:uid(),date:"2026-10-09",title:"Alinhamento Quinzenal",
+      pautas:"- Preciso do link do outro canal, para que possamos jogar inscritos pra ele\n- Sobre a mensagem de revisão diária, o que vcs acham? Tem feedback para add algo por lá?\n- Ideia: Ter uma frente visando atração de seguidores, para Net e para o Class\n- Vi que vcs tiveram a integração de novos corretores na unidade da Prolar\n- Dias específicos para produção de conteúdos (datas)\n- dar feedback e pedir feedback deles",
+      acoes:[{id:uid(),text:"Ver quantidade de seguidores que cada anúncio trouxe - Guilherme",done:false},{id:uid(),text:"Ativar campanha de seguidores para a Net e Class",done:false}]});
+    return list;
+  }
+  function clean(list){
+    if(!Array.isArray(list)) throw new Error("formato");
+    return list.filter(c=>c && typeof c.name==="string").map(c=>({
+      id:String(c.id||uid()), name:c.name,
+      lembretes:(Array.isArray(c.lembretes)&&c.lembretes.length?c.lembretes:[blank()]).map(i=>({id:String(i.id||uid()),text:String(i.text||""),done:!!i.done})),
+      meetings:(Array.isArray(c.meetings)?c.meetings:[]).map(m=>({id:String(m.id||uid()),date:String(m.date||""),title:String(m.title||""),pautas:String(m.pautas||""),
+        acoes:(Array.isArray(m.acoes)?m.acoes:[]).map(a=>({id:String(a.id||uid()),text:String(a.text||""),done:!!a.done}))}))
+    }));
+  }
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+  let clients; try{ clients = saved && saved.clients ? clean(saved.clients) : seed(); }catch(e){ clients = seed(); }
+
+  let saveTimer;
+  function save(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>{
+      try{ localStorage.setItem(KEY, JSON.stringify({clients, mode:S.mode, sel:S.sel, savedAt:new Date().toISOString()})); }
+      catch(e){ toast("Não foi possível salvar neste navegador"); }
+    }, 300);
+  }
+  window.addEventListener("beforeunload", ()=>{ try{ localStorage.setItem(KEY, JSON.stringify({clients, mode:S.mode, sel:S.sel, savedAt:new Date().toISOString()})); }catch(e){} });
+  function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+
+  const S = { mode:(saved&&saved.mode)||"reunioes", sel:null, meeting:null, query:"", hideDone:false, confirmDel:false };
+  S.sel = (saved && clients.find(c=>c.id===saved.sel)) ? saved.sel : (clients[0]||{}).id;
+
+  $("#exportBtn").addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify({app:"squad-d-painel",version:1,exportedAt:new Date().toISOString(),clients},null,2)],{type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "backup-squad-d-"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast("Backup exportado");
+  });
+  $("#importBtn").addEventListener("click", ()=>$("#importFile").click());
+  $("#importFile").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try{
+        const data = JSON.parse(r.result);
+        const list = clean(data.clients || data);
+        clients.splice(0, clients.length, ...list);
+        S.sel = (clients[0]||{}).id; S.meeting=null; save(); renderSide(); renderMain(true);
+        toast("Backup importado: "+clients.length+" clientes");
+      }catch(err){ toast("Arquivo inválido. Use um backup exportado por este painel."); }
+      e.target.value = "";
+    };
+    r.readAsText(f);
+  });
+  const cur = () => clients.find(c=>c.id===S.sel);
+  const openL = c => c.lembretes.filter(i=>!i.done && i.text.trim()).length;
+  const openA = m => (m.acoes||[]).filter(a=>!a.done && a.text.trim()).length;
+  const openM = c => c.meetings.reduce((n,m)=>n+openA(m),0);
+  const sortedMeetings = c => c.meetings.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+
+  // ---------- switch ----------
+  $("#switch").addEventListener("click", e=>{
+    const b = e.target.closest("button[data-mode]"); if(!b || b.dataset.mode===S.mode) return;
+    S.mode = b.dataset.mode; S.confirmDel=false;
+    syncSwitch();
+    renderSide(); renderMain(true);
+  });
+
+  // ---------- sidebar ----------
+  function syncSwitch(){
+    $("#switch").dataset.mode = S.mode;
+    $("#switch").querySelectorAll("button").forEach(x=>x.setAttribute("aria-selected", x.dataset.mode===S.mode));
+  }
+  function renderSide(){
+    save();
+    $("#count").textContent = clients.length + (clients.length===1?" cliente":" clientes");
+    const q = norm(S.query.trim());
+    const list = q ? clients.filter(c=>norm(c.name).includes(q)) : clients;
+    $("#clients").innerHTML = list.length ? list.map(c=>{
+      const n = S.mode==="lembretes" ? openL(c) : openM(c);
+      return '<li><button data-id="'+c.id+'" aria-current="'+(c.id===S.sel)+'"><span class="nm">'+esc(c.name)+'</span>'+(n?'<span class="badge">'+n+'</span>':'')+'</button></li>';
+    }).join("") : '<li class="empty-search">Nenhum cliente encontrado.</li>';
+  }
+  $("#clients").addEventListener("click", e=>{
+    const b = e.target.closest("button[data-id]"); if(!b) return;
+    S.sel = b.dataset.id; S.meeting=null; S.confirmDel=false; renderSide(); renderMain(true);
+  });
+  $("#search").addEventListener("input", e=>{ S.query=e.target.value; renderSide(); });
+  $("#addForm").addEventListener("submit", e=>{
+    e.preventDefault(); const name=$("#newName").value.trim(); if(!name) return;
+    const c={id:uid(),name,lembretes:[blank()],meetings:[]}; clients.push(c);
+    $("#newName").value=""; S.sel=c.id; S.meeting=null; renderSide(); renderMain(true);
+  });
+
+  // ---------- main ----------
+  function header(c, subHTML){
+    return '<div class="mode-tag">'+(S.mode==="lembretes"?"Squad D · Lembretes":"Squad D · Reuniões")+'</div>'+
+      '<div class="head"><input id="clientName" class="title" value="'+esc(c.name)+'" aria-label="Nome do cliente">'+
+      (S.confirmDel ? '<div class="confirm">Excluir '+esc(c.name)+'? <button class="yes" id="delYes">Excluir</button><button class="no" id="delNo">Cancelar</button></div>'
+                    : '<button class="btn-ghost-danger" id="delClient">Excluir cliente</button>')+
+      '</div><p class="sub">'+subHTML+'</p>';
+  }
+  function listHTML(items, hide){
+    return items.filter(i=>!(hide && i.done)).map(i=>
+      '<li class="item'+(i.done?" done":"")+'" data-id="'+i.id+'"><input type="checkbox" '+(i.done?"checked":"")+' aria-label="Marcar como feito">'+
+      '<textarea rows="1" placeholder="Escreva aqui…">'+esc(i.text)+'</textarea><button class="del" aria-label="Apagar linha">×</button></li>').join("");
+  }
+  function renderMain(animate){
+    const m = $("#main"); const c = cur();
+    if(!c){ m.innerHTML='<div class="nothing">Selecione um cliente na lista.</div>'; return; }
+    m.innerHTML = S.mode==="lembretes" ? lembretesHTML(c) : reunioesHTML(c);
+    m.classList.remove("fade"); if(animate){ void m.offsetWidth; m.classList.add("fade"); }
+    m.querySelectorAll(".item textarea").forEach(autosize);
+  }
+  function lembretesHTML(c){
+    const p=openL(c), d=c.lembretes.filter(i=>i.done && i.text.trim()).length;
+    return header(c,'<b>'+p+'</b> '+(p===1?"pendente":"pendentes")+' · '+d+' '+(d===1?"concluída":"concluídas"))+
+      '<section class="card" style="max-width:980px"><div class="card-head"><div><h2>Lembretes e pontos para fazer</h2><p>Enter cria a próxima linha. Marque quando estiver feito.</p></div>'+
+      '<div class="tools"><button class="chip" id="toggleDone" aria-pressed="'+S.hideDone+'">Ocultar concluídas</button>'+(d?'<button class="chip" id="clearDone">Limpar concluídas</button>':'')+'</div></div>'+
+      '<ul class="items" data-list="lembretes">'+listHTML(c.lembretes,S.hideDone)+'</ul>'+
+      '<button class="add-line" id="addLine"><span>+</span>Adicionar anotação</button></section>';
+  }
+  function reunioesHTML(c){
+    const ms = sortedMeetings(c);
+    if(!S.meeting || !ms.find(x=>x.id===S.meeting)) S.meeting = ms[0] ? ms[0].id : null;
+    const n=openM(c);
+    const sub = ms.length ? ms.length+' '+(ms.length===1?"reunião registrada":"reuniões registradas")+', <b>'+n+'</b> '+(n===1?"ação pendente":"ações pendentes") : "Nenhuma reunião registrada ainda";
+    let h = header(c, sub)+'<div class="mtabs"><button class="mtab mtab-new" id="newMeeting">+ Nova reunião</button>'+
+      ms.map(x=>'<button class="mtab" data-mid="'+x.id+'" aria-selected="'+(x.id===S.meeting)+'">'+esc(fmtDate(x.date))+(openA(x)?'<span class="dot"></span>':'')+'</button>').join("")+'</div>';
+    const m = c.meetings.find(x=>x.id===S.meeting);
+    if(!m) return h+'<div class="nothing">Crie a primeira reunião para anotar pautas e ações.<br><button class="btn-primary" id="newMeeting2">Nova reunião</button></div>';
+    return h+'<div class="mbar"><input type="date" id="mDate" value="'+esc(m.date)+'" aria-label="Data"><input class="mt" id="mTitle" value="'+esc(m.title)+'" placeholder="Assunto da reunião" aria-label="Assunto"><span class="status">Salvo automaticamente</span></div>'+
+      '<div class="cols"><section class="card"><div class="card-head"><div><h2>Pautas da reunião</h2><p>O que vai ser discutido e o que foi falado</p></div></div>'+
+      '<textarea class="pautas" id="mPautas" placeholder="Escreva as pautas aqui…">'+esc(m.pautas)+'</textarea></section>'+
+      '<section class="card"><div class="card-head"><div><h2>Ações para aplicar após a reunião</h2><p>Enter cria a próxima. Marque quando estiver feita.</p></div></div>'+
+      '<ul class="items" data-list="acoes">'+listHTML(m.acoes)+'</ul><button class="add-line" id="addLine"><span>+</span>Adicionar ação</button></section></div>'+
+      '<div class="mfoot"><button class="btn-ghost-danger" id="delMeeting">Excluir esta reunião</button></div>';
+  }
+  function autosize(t){ t.style.height="auto"; t.style.height=t.scrollHeight+"px"; }
+  const activeList = () => { const c=cur(); if(S.mode==="lembretes") return c.lembretes; const m=c.meetings.find(x=>x.id===S.meeting); return m?m.acoes:null; };
+  function focusItem(id){ const t=document.querySelector('.item[data-id="'+id+'"] textarea'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } }
+  function refreshCounts(){
+    renderSide(); const c=cur(); const sub=document.querySelector(".sub"); if(!sub) return;
+    if(S.mode==="lembretes"){ const p=openL(c), d=c.lembretes.filter(i=>i.done&&i.text.trim()).length; sub.innerHTML='<b>'+p+'</b> '+(p===1?"pendente":"pendentes")+' · '+d+' '+(d===1?"concluída":"concluídas"); }
+  }
+
+  const main=$("#main");
+  main.addEventListener("input", e=>{
+    const c=cur(); const t=e.target;
+    if(t.id==="clientName"){ c.name=t.value; renderSide(); return; }
+    const m=c.meetings.find(x=>x.id===S.meeting);
+    if(t.id==="mTitle" && m){ m.title=t.value; save(); return; }
+    if(t.id==="mPautas" && m){ m.pautas=t.value; save(); return; }
+    if(t.id==="mDate" && m){ m.date=t.value; save(); renderMain(); return; }
+    if(t.tagName==="TEXTAREA" && t.closest(".item")){
+      const list=activeList(); const it=list.find(i=>i.id===t.closest(".item").dataset.id);
+      it.text=t.value.replace(/\n/g," "); autosize(t); refreshCounts();
+    }
+  });
+  main.addEventListener("change", e=>{
+    if(e.target.type!=="checkbox") return;
+    const list=activeList(); const it=list.find(i=>i.id===e.target.closest(".item").dataset.id);
+    it.done=e.target.checked; renderMain(); renderSide();
+  });
+  main.addEventListener("keydown", e=>{
+    const t=e.target;
+    if(t.id==="clientName" && e.key==="Enter"){ e.preventDefault(); t.blur(); return; }
+    if(t.tagName!=="TEXTAREA" || !t.closest(".item")) return;
+    const list=activeList(); const id=t.closest(".item").dataset.id; const k=list.findIndex(i=>i.id===id);
+    if(e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); const n=blank(); list.splice(k+1,0,n); renderMain(); renderSide(); focusItem(n.id); }
+    else if(e.key==="Backspace" && t.value===""){ e.preventDefault(); if(list.length===1) return; list.splice(k,1); renderMain(); renderSide(); focusItem((list[k-1]||list[0]).id); }
+    else if(e.key==="ArrowUp" && t.selectionStart===0 && k>0){ e.preventDefault(); focusItem(list[k-1].id); }
+    else if(e.key==="ArrowDown" && t.selectionEnd===t.value.length && k<list.length-1){ e.preventDefault(); focusItem(list[k+1].id); }
+  });
+  main.addEventListener("click", e=>{
+    const c=cur(); const t=e.target;
+    if(t.closest(".del")){ const list=activeList(); const k=list.findIndex(i=>i.id===t.closest(".item").dataset.id); list.splice(k,1); if(!list.length && S.mode==="lembretes") list.push(blank()); renderMain(); renderSide(); }
+    else if(t.closest("#addLine")){ const list=activeList(); const last=list[list.length-1]; if(last && !last.text.trim() && !last.done){ focusItem(last.id); return; } const n=blank(); list.push(n); renderMain(); renderSide(); focusItem(n.id); }
+    else if(t.closest("[data-mid]")){ S.meeting=t.closest("[data-mid]").dataset.mid; renderMain(); }
+    else if(t.id==="newMeeting"||t.id==="newMeeting2"){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); const m={id:uid(),date:d.toISOString().slice(0,10),title:"",pautas:"",acoes:[blank()]}; c.meetings.push(m); S.meeting=m.id; renderMain(); const ti=$("#mTitle"); if(ti) ti.focus(); }
+    else if(t.id==="delMeeting"){ if(t.dataset.armed){ c.meetings=c.meetings.filter(x=>x.id!==S.meeting); S.meeting=null; renderMain(); renderSide(); } else { t.dataset.armed="1"; t.textContent="Confirmar exclusão"; } }
+    else if(t.id==="toggleDone"){ S.hideDone=!S.hideDone; renderMain(); }
+    else if(t.id==="clearDone"){ c.lembretes=c.lembretes.filter(i=>!i.done); if(!c.lembretes.length) c.lembretes.push(blank()); renderMain(); renderSide(); }
+    else if(t.id==="delClient"){ S.confirmDel=true; renderMain(); }
+    else if(t.id==="delNo"){ S.confirmDel=false; renderMain(); }
+    else if(t.id==="delYes"){ const k=clients.indexOf(c); clients.splice(k,1); S.confirmDel=false; S.sel=(clients[Math.min(k,clients.length-1)]||{}).id; S.meeting=null; renderSide(); renderMain(true); }
+  });
+
+  syncSwitch(); renderSide(); renderMain();
+})();
+</script>
 </body>
 </html>
